@@ -1,113 +1,69 @@
-# Funki
+<p align="center">
+  <img src=".github/icon.png" width="128" height="128" alt="Funki app icon">
+</p>
 
-A tiny macOS menu bar app that shows whether you are online.
+<h1 align="center">Funki</h1>
 
-Funki does one thing: it checks whether the internet is actually reachable, not
-just whether Wi-Fi is connected, and shows the answer in the menu bar. It is
-written in Swift with AppKit, has no third-party dependencies and is built to
-run for weeks without you noticing it.
+<p align="center">
+  A tiny macOS menu bar app that shows whether you are online.
+</p>
 
-## What it does
+<p align="center">
+  <a href="https://github.com/danielstgt/funki/releases/latest"><b>Download</b></a>
+  &nbsp;·&nbsp;
+  <a href="#install">Install</a>
+  &nbsp;·&nbsp;
+  <a href="#build-from-source">Build from source</a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/danielstgt/funki/issues">Report a bug</a>
+</p>
 
-| Menu bar icon | Meaning | What Funki is doing |
-| --- | --- | --- |
-| Antenna | Online | One small request every 30 seconds |
-| Red, crossed-out antenna | Offline, but a network is connected | Retries every second until the internet is back |
-| Red, crossed-out antenna | Offline, no network at all | Nothing. macOS tells Funki when a network appears |
-| Dimmed antenna | Paused | Nothing |
+<br>
 
-The menu shows the current status and the reason when you are offline, and lets
-you pause the checks, open the settings and start Funki at login. Opening the
-menu triggers a fresh check.
+Funki checks whether the internet is actually reachable, not just whether Wi-Fi
+is connected, and shows the answer in the menu bar.
 
-Below the status, the menu shows how long the latest check took and a bar for
-each of the last 60 checks, with the newest on the right. A check that failed is
-a dotted red bar, and an outage is a single one, however long it lasted. The
-graph starts over when you change the server.
+| Menu bar icon | Status |
+| --- | --- |
+| Antenna | Online |
+| Red, crossed-out antenna | Offline |
+| Dimmed antenna | Paused |
 
-*Launch at Login* registers Funki as a login item through `SMAppService`, the
-standard macOS mechanism. If macOS wants your approval first, Funki opens the
-Login Items settings and shows a dash instead of a checkmark until you allow it.
+The menu shows the latency of the last 60 checks as a small graph, and lets you
+pause the checks or launch Funki at login.
 
-## How it works
-
-**Network changes are events, not polling.** Funki listens to `NWPathMonitor`.
-Joining a Wi-Fi network, plugging in a cable or connecting a VPN triggers a
-check immediately. Losing the last network sets the status to offline without a
-single request.
-
-**A probe confirms real connectivity.** A connected network does not mean the
-internet works, so Funki requests `http://captive.apple.com`, the server macOS
-uses for the same purpose, and expects Apple's `Success` page. Redirects are not
-followed, so a captive portal that answers in Apple's place counts as offline.
-
-**Getting back online is detected fast.** While the connection is down, Funki
-probes back to back: one second after a probe that failed quickly, and right
-away after one that ran into its three second timeout. Every probe is a fresh
-attempt, so a recovered connection is noticed within about a second when probes
-fail quickly, and within three seconds when they time out.
-
-**Going offline needs a second opinion.** A single failed probe is retried
-before the status changes, so one lost request does not make the icon flicker.
-
-**Latency is the whole request.** It runs from sending the request to the
-checked answer, so it includes looking up the name and connecting whenever the
-previous connection can't be reused.
-
-**Nothing accumulates.** There is one `URLSession` without cache, cookies or
-credential storage, and one probe at a time. The latencies live in a ring buffer
-of 60 entries, about 1.5 KB that are allocated once, and the graph is only drawn
-while the menu is open. Only the response headers are read, plus Apple's 69 byte
-body. While online the timer has a tolerance of a sixth of the interval so macOS
-can batch the wakeup with others. Memory use stays at about 13 MB, whether Funki
-has been idling online or retrying every second.
+- **Fast.** A network change triggers a check right away, and a restored
+  connection shows up within seconds.
+- **Light.** One small request every 30 seconds while online, none at all
+  without a network. About 13 MB of memory.
+- **Private.** No analytics, no update check, no permissions, nothing stored
+  apart from your settings. Funki only talks to `captive.apple.com`, the server
+  macOS uses for the same check, or to a server you choose.
 
 ## Install
 
-Funki runs on macOS 14 or later, on Apple silicon and Intel.
+Requires macOS 14 or later, on Apple silicon or Intel.
 
-**Download:** grab `Funki-<version>.zip` from the
-[latest release](https://github.com/danielstgt/funki/releases/latest), unzip it
-and move `Funki.app` to your Applications folder.
+1. Download `Funki-<version>.zip` from the
+   [latest release](https://github.com/danielstgt/funki/releases/latest), unzip
+   it and move `Funki.app` to Applications.
+2. Funki is not notarized, so macOS blocks the first launch. Open
+   **System Settings › Privacy & Security** and click **Open Anyway**, or run:
 
-The releases are ad-hoc signed, not notarized. On first launch macOS refuses to
-open the app. Open **System Settings › Privacy & Security**, scroll down to
-*Security*, click **Open Anyway** next to the Funki notice and confirm.
-Alternatively, clear the quarantine flag in Terminal:
-
-```sh
-xattr -dr com.apple.quarantine /Applications/Funki.app
-```
-
-**Or build it yourself** with `make install`, see [Build](#build).
+   ```sh
+   xattr -dr com.apple.quarantine /Applications/Funki.app
+   ```
 
 ## Settings
 
-Choose *Settings…* in the menu.
+Under *Settings…* in the menu you can change the server, the check interval
+while online (30 seconds) and the retry interval while offline (1 second).
+A custom server can be any `http` or `https` URL. Prefer `https`: over plain
+`http`, a captive portal could pass for being online.
 
-| Setting | Default | Notes |
-| --- | --- | --- |
-| Server | `http://captive.apple.com` | Leave empty for the default |
-| Check every … seconds while online | 30 | At least 5 |
-| Retry every … seconds while offline | 1 | At least 1 |
+## Build from source
 
-*Reset to Defaults* fills in the defaults for all three. Like every other
-change, it takes effect when you save.
-
-A custom server can be any `http` or `https` URL. A bare host name is treated
-as `https`.
-
-- A `2xx` response counts as online. Over `https` a redirect does too, because
-  the server has proven its identity. Over plain `http` a redirect counts as
-  offline, since that is how captive portals intercept requests.
-- Prefer `https` or an endpoint made for this purpose. Funki cannot verify the
-  body of a custom address, so a captive portal that answers a plain `http`
-  request with `200` would look like being online.
-
-## Build
-
-Funki targets macOS 14 or later and is developed and tested on macOS 27 with
-Xcode 27. Building it takes Swift 6 or later.
+Requires Swift 6 or later.
 
 ```sh
 git clone https://github.com/danielstgt/funki.git
@@ -115,42 +71,7 @@ cd funki
 make install
 ```
 
-| Command | What it does |
-| --- | --- |
-| `make` | Builds `build/Funki.app`, universal and ad-hoc signed |
-| `make run` | Builds and launches it |
-| `make install` | Builds and copies it to `/Applications` |
-| `make zip` | Builds `build/Funki-<version>.zip` for a release |
-| `make clean` | Removes the build output |
-
-Everything is plain Swift Package Manager. The Makefile only assembles the
-`.app` bundle, draws the icon with `Scripts/generate-icon.swift` and signs it.
-Pass `SIGN_IDENTITY="Developer ID Application: …"` to sign with your own
-certificate.
-
-You can also open `Package.swift` in Xcode. Running it from there starts the
-executable without its bundle, which is fine for debugging, but *Launch at
-Login* only works in the bundled app.
-
-Releases are cut by pushing a tag: `git tag v0.2.0 && git push origin v0.2.0`.
-The workflow in `.github/workflows/release.yml` builds the app on a macOS runner
-and attaches the zip to a GitHub release. It uses no marketplace actions.
-Started by hand, it only builds, which is a way to check a release before
-tagging it.
-
-## Privacy
-
-Funki sends a plain `GET` request to the configured server and nothing else. It
-asks for no permissions and is signed without entitlements. There is no
-analytics, no update check and no data stored apart from your settings. The
-latencies in the graph are kept in memory only and are gone when Funki quits.
-
-Status changes are written to the system log, which helps when something looks
-wrong:
-
-```sh
-log stream --level info --predicate 'subsystem == "io.github.danielstgt.funki"'
-```
+`make run` builds and launches Funki, `make zip` creates a release archive.
 
 ## License
 
