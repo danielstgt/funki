@@ -7,7 +7,7 @@
 #   make clean
 
 APP        := Funki
-VERSION    ?= 0.1.0
+VERSION    ?= 0.2.0
 BUILD      ?= $(shell git rev-list --count HEAD 2>/dev/null || echo 1)
 BUNDLE_ID  ?= io.github.danielstgt.funki
 MIN_OS     := 14.0
