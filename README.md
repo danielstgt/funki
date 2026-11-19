@@ -52,6 +52,25 @@ tolerance of a sixth of the interval so macOS can batch the wakeup with others.
 Memory use stays at about 13 MB, whether Funki has been idling online or
 retrying every second.
 
+## Install
+
+Funki runs on macOS 14 or later, on Apple silicon and Intel.
+
+**Download:** grab `Funki-<version>.zip` from the
+[latest release](https://github.com/danielstgt/funki/releases/latest), unzip it
+and move `Funki.app` to your Applications folder.
+
+The releases are ad-hoc signed, not notarized. On first launch macOS refuses to
+open the app. Open **System Settings › Privacy & Security**, scroll down to
+*Security*, click **Open Anyway** next to the Funki notice and confirm.
+Alternatively, clear the quarantine flag in Terminal:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/Funki.app
+```
+
+**Or build it yourself** with `make install`, see [Build](#build).
+
 ## Settings
 
 Choose *Settings…* in the menu.
