@@ -4,6 +4,7 @@
 #   make run        build and launch it
 #   make install    copy it to /Applications
 #   make zip        build/Funki-<version>.zip for a GitHub release
+#   make og-image   render the social preview image for GitHub (Art/og-image.jpg)
 #   make clean
 
 APP        := Funki
@@ -29,7 +30,7 @@ ICNS       := $(BUILD_DIR)/AppIcon.icns
 # your deployment target", although the app itself targets macOS $(MIN_OS).
 SWIFT_BUILD := swift build -c release $(ARCHS) --product $(APP)
 
-.PHONY: all build app run install zip clean
+.PHONY: all build app run install zip og-image clean
 
 all: app
 
@@ -69,6 +70,10 @@ zip: app
 	rm -f $(BUILD_DIR)/$(APP)-$(VERSION).zip
 	ditto -c -k --keepParent $(APP_DIR) $(BUILD_DIR)/$(APP)-$(VERSION).zip
 	@echo "Created $(BUILD_DIR)/$(APP)-$(VERSION).zip"
+
+# Drawn from the same 1024 pixel icon as the app, so the two never drift apart.
+og-image: $(ICNS) Art/generate-og-image.swift
+	swift Art/generate-og-image.swift $(ICONSET)/icon_512x512@2x.png Art/og-image.jpg
 
 clean:
 	rm -rf $(BUILD_DIR) .build
