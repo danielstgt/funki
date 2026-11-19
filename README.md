@@ -122,6 +122,12 @@ You can also open `Package.swift` in Xcode. Running it from there starts the
 executable without its bundle, which is fine for debugging, but *Launch at
 Login* only works in the bundled app.
 
+Releases are cut by pushing a tag: `git tag v0.2.0 && git push origin v0.2.0`.
+The workflow in `.github/workflows/release.yml` builds the app on a macOS runner
+and attaches the zip to a GitHub release. It uses no marketplace actions.
+Started by hand, it only builds, which is a way to check a release before
+tagging it.
+
 ## Privacy
 
 Funki sends a plain `GET` request to the configured server and nothing else. It

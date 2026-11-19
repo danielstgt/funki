@@ -1,0 +1,37 @@
+# Builds Funki.app and attaches it to a GitHub release whenever a `v*` tag is pushed.
+#
+#   git tag v0.2.0 && git push origin v0.2.0
+#
+# Started by hand, from the Actions tab or with `gh workflow run release.yml`, it
+# only builds. That shows whether a release would succeed without creating one.
+#
+# Deliberately uses no third-party (or marketplace) actions: the repository is
+# cloned with git and the release is created with the preinstalled `gh` CLI.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-26
+    steps:
+      - name: Check out
+        run: git clone --branch "$GITHUB_REF_NAME" "https://github.com/$GITHUB_REPOSITORY.git" .
+
+      - name: Build app and zip
+        run: make zip VERSION="${GITHUB_REF_NAME#v}"
+
+      - name: Create GitHub release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" build/Funki-*.zip \
+            --title "Funki ${GITHUB_REF_NAME#v}" \
+            --generate-notes
