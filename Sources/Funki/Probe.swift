@@ -17,7 +17,7 @@ struct Endpoint: Equatable, Sendable {
 }
 
 /// Why Funki considers the connection to be down.
-enum Failure: Equatable, Sendable {
+enum Failure: Error, Equatable {
     /// No network interface is usable, so there is nothing to probe.
     case noNetwork
     /// The request failed or timed out.
@@ -43,8 +43,12 @@ enum Probe {
         return URLSession(configuration: configuration, delegate: RedirectBlocker(), delegateQueue: nil)
     }()
 
-    /// Requests the endpoint once. Returns `nil` when the internet is reachable.
-    static func run(_ endpoint: Endpoint, timeout: TimeInterval) async -> Failure? {
+    /// Requests the endpoint once. When the internet is reachable, the result
+    /// is how long the answer took.
+    static func run(_ endpoint: Endpoint, timeout: TimeInterval) async -> Result<Duration, Failure> {
+        // Measured here rather than by the caller, so a busy main thread
+        // doesn't add to it. This clock stands still while the Mac sleeps.
+        let started = SuspendingClock.now
         let request = URLRequest(
             url: endpoint.url,
             cachePolicy: .reloadIgnoringLocalCacheData,
@@ -56,26 +60,26 @@ enum Probe {
             // custom URL that points at a large page from being downloaded.
             defer { bytes.task.cancel() }
 
-            guard let status = (response as? HTTPURLResponse)?.statusCode else { return .noResponse }
+            guard let status = (response as? HTTPURLResponse)?.statusCode else { return .failure(.noResponse) }
 
             // Over TLS the server has proven its identity, so a redirect is as
             // good as any other answer. Over plain HTTP a redirect is exactly
             // how captive portals intercept requests.
             let isSecure = endpoint.url.scheme?.lowercased() == "https"
             guard (200..<300).contains(status) || (isSecure && (300..<400).contains(status)) else {
-                return .unexpectedResponse(status: status)
+                return .failure(.unexpectedResponse(status: status))
             }
 
             if let expectedBody = endpoint.expectedBody {
                 var body: [UInt8] = []
                 for try await byte in bytes.prefix(512) { body.append(byte) }
                 guard String(decoding: body, as: UTF8.self).contains(expectedBody) else {
-                    return .unexpectedResponse(status: status)
+                    return .failure(.unexpectedResponse(status: status))
                 }
             }
-            return nil
+            return .success(SuspendingClock.now - started)
         } catch {
-            return .noResponse
+            return .failure(.noResponse)
         }
     }
 }

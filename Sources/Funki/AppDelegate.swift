@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
     private let statusLine = NSMenuItem()
+    private lazy var graph = LatencyGraph(history: monitor.history)
     private let pauseItem = NSMenuItem(title: "", action: #selector(togglePause), keyEquivalent: "")
     private let settingsItem = NSMenuItem(title: "Settings…", action: #selector(editSettings), keyEquivalent: ",")
     private let loginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
@@ -18,10 +19,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         NSApp.mainMenu = makeEditMenu()
 
         for item in [pauseItem, settingsItem, loginItem] { item.target = self }
+        let latency = NSMenuItem()
+        latency.view = graph
         let menu = NSMenu()
         menu.delegate = self
         menu.items = [
             statusLine,
+            latency,
             .separator(),
             pauseItem,
             .separator(),
@@ -59,6 +63,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case .requiresApproval: .mixed
         default: .off
         }
+        graph.menuHasCheckmark = loginItem.state != .off
         // Whoever opens the menu wants to know the status as of now.
         monitor.checkNow()
     }

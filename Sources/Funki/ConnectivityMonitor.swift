@@ -46,9 +46,14 @@ final class ConnectivityMonitor {
     var settings: Settings {
         didSet {
             guard settings != oldValue else { return }
+            if settings.endpoint != oldValue.endpoint { history.removeAll() }
             checkNow()
         }
     }
+
+    /// How long the latest probes took. It starts over with a new server,
+    /// since the latencies of two servers don't compare.
+    let history = LatencyHistory()
 
     private var pathUpdates: Task<Void, Never>?
     private var probing: Task<Void, Never>?
@@ -88,12 +93,12 @@ final class ConnectivityMonitor {
         probing = Task {
             while !Task.isCancelled {
                 let started = ContinuousClock.now
-                let failure = await Probe.run(
+                let result = await Probe.run(
                     settings.endpoint,
                     timeout: isUrgent ? Self.retryTimeout : Self.relaxedTimeout
                 )
                 guard !Task.isCancelled else { return }
-                record(failure)
+                record(result)
 
                 // The result decides the pace. The interval counts from the
                 // start of the probe, so one that ran into its timeout is
@@ -124,15 +129,18 @@ final class ConnectivityMonitor {
         }
     }
 
-    private func record(_ failure: Failure?) {
-        if let failure {
+    private func record(_ result: Result<Duration, Failure>) {
+        switch result {
+        case .success(let latency):
+            failures = 0
+            status = .online
+            history.append(latency)
+        case .failure(let failure):
             failures += 1
             if status != .online || failures >= Self.failuresUntilOffline {
                 status = .offline(failure)
             }
-        } else {
-            failures = 0
-            status = .online
+            history.append(nil)
         }
         preventAppNap(isUrgent)
     }

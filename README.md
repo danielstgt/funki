@@ -20,6 +20,11 @@ The menu shows the current status and the reason when you are offline, and lets
 you pause the checks, open the settings and start Funki at login. Opening the
 menu triggers a fresh check.
 
+Below the status, the menu shows how long the latest check took and a bar for
+each of the last 60 checks, with the newest on the right. A check that failed is
+a dotted red bar, and an outage is a single one, however long it lasted. The
+graph starts over when you change the server.
+
 *Launch at Login* registers Funki as a login item through `SMAppService`, the
 standard macOS mechanism. If macOS wants your approval first, Funki opens the
 Login Items settings and shows a dash instead of a checkmark until you allow it.
@@ -45,12 +50,17 @@ fail quickly, and within three seconds when they time out.
 **Going offline needs a second opinion.** A single failed probe is retried
 before the status changes, so one lost request does not make the icon flicker.
 
+**Latency is the whole request.** It runs from sending the request to the
+checked answer, so it includes looking up the name and connecting whenever the
+previous connection can't be reused.
+
 **Nothing accumulates.** There is one `URLSession` without cache, cookies or
-credential storage, one probe at a time, and no history. Only the response
-headers are read, plus Apple's 69 byte body. While online the timer has a
-tolerance of a sixth of the interval so macOS can batch the wakeup with others.
-Memory use stays at about 13 MB, whether Funki has been idling online or
-retrying every second.
+credential storage, and one probe at a time. The latencies live in a ring buffer
+of 60 entries, about 1.5 KB that are allocated once, and the graph is only drawn
+while the menu is open. Only the response headers are read, plus Apple's 69 byte
+body. While online the timer has a tolerance of a sixth of the interval so macOS
+can batch the wakeup with others. Memory use stays at about 13 MB, whether Funki
+has been idling online or retrying every second.
 
 ## Install
 
@@ -132,7 +142,8 @@ tagging it.
 
 Funki sends a plain `GET` request to the configured server and nothing else. It
 asks for no permissions and is signed without entitlements. There is no
-analytics, no update check and no data stored apart from your settings.
+analytics, no update check and no data stored apart from your settings. The
+latencies in the graph are kept in memory only and are gone when Funki quits.
 
 Status changes are written to the system log, which helps when something looks
 wrong:
